@@ -139,6 +139,12 @@
     font-size: 12px;
     color: var(--muted);
   }
+  footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -167,7 +173,7 @@
 
     <button class="again" id="againBtn">🔄 다시 하기</button>
 
-    <footer>매번 새로운 숫자로 랜덤 시작 · 점심시간 두뇌 리프레시</footer>
+    <footer>매번 새로운 숫자로 랜덤 시작 · 점심시간 두뇌 리프레시<br><a href="dashboard.html">📊 내 기록 대시보드 보기</a></footer>
   </div>
 
 <script>
@@ -183,21 +189,39 @@
   const historyEl = document.getElementById('history');
   const againBtn = document.getElementById('againBtn');
 
-  function loadBest() {
+  const STATS_KEY = 'numberGameStats';
+
+  function loadStats() {
     try {
-      const saved = localStorage.getItem('numberGameBest');
-      if (saved) bestEl.textContent = saved + '회';
+      const raw = JSON.parse(localStorage.getItem(STATS_KEY));
+      if (raw && Array.isArray(raw.history)) return raw;
     } catch (e) {}
+    // migrate old single best-score key if present
+    let bestTries = null;
+    try {
+      const legacy = parseInt(localStorage.getItem('numberGameBest'), 10);
+      if (legacy) bestTries = legacy;
+    } catch (e) {}
+    return { totalPlays: 0, bestTries, history: [] };
   }
 
-  function saveBest(n) {
-    try {
-      const saved = parseInt(localStorage.getItem('numberGameBest'), 10);
-      if (!saved || n < saved) {
-        localStorage.setItem('numberGameBest', n);
-        bestEl.textContent = n + '회';
-      }
-    } catch (e) {}
+  function saveStats(stats) {
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+  }
+
+  function showBest() {
+    const stats = loadStats();
+    bestEl.textContent = stats.bestTries ? stats.bestTries + '회' : '-';
+  }
+
+  function recordWin(triesCount, seconds) {
+    const stats = loadStats();
+    stats.totalPlays += 1;
+    if (!stats.bestTries || triesCount < stats.bestTries) stats.bestTries = triesCount;
+    stats.history.push({ tries: triesCount, seconds, date: new Date().toISOString() });
+    if (stats.history.length > 20) stats.history = stats.history.slice(-20);
+    saveStats(stats);
+    bestEl.textContent = stats.bestTries + '회';
   }
 
   function formatTime(sec) {
@@ -248,6 +272,7 @@
     chip.className = 'chip';
 
     if (guess === target) {
+      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
       clearInterval(timerInterval);
       finished = true;
       msg.textContent = `🎉 정답! ${tries}번 만에 맞혔어요`;
@@ -256,7 +281,7 @@
       input.disabled = true;
       form.querySelector('button').disabled = true;
       againBtn.classList.add('show');
-      saveBest(tries);
+      recordWin(tries, elapsedSeconds);
     } else if (guess < target) {
       msg.textContent = '⬆️ 더 큰 숫자예요';
       msg.className = 'msg up';
@@ -274,7 +299,7 @@
 
   againBtn.addEventListener('click', resetGame);
 
-  loadBest();
+  showBest();
   resetGame();
 </script>
 </body>

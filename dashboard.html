@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>게임 대시보드 - 점심시간 게임 기록</title>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --primary: #4f6df5;
+    --primary-dark: #3b52c4;
+    --ink: #0b0b0b;
+    --ink-secondary: #52514e;
+    --ink-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --bar: #2a78d6;
+    --bar-best: #1baf7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+    color: var(--ink);
+    padding: 24px 16px 60px;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  header p {
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: 13px;
+  }
+  .back-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .stat-tile .label {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+  }
+  .stat-tile .value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .stat-tile.highlight .value { color: var(--bar-best); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 2px;
+  }
+  .card .desc {
+    font-size: 12px;
+    color: var(--ink-muted);
+    margin: 0 0 16px;
+  }
+
+  .chart {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 120px;
+    padding-top: 8px;
+    border-bottom: 1px solid var(--baseline);
+  }
+  .bar {
+    flex: 1;
+    min-width: 8px;
+    background: var(--bar);
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    transition: background .12s ease, opacity .12s ease;
+  }
+  .bar:hover { background: var(--primary-dark); }
+  .bar.is-best { background: var(--bar-best); }
+
+  .tooltip {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    background: var(--ink);
+    color: #fff;
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .1s ease;
+    top: 0;
+    left: 0;
+    z-index: 10;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--ink);
+  }
+
+  .empty {
+    text-align: center;
+    padding: 24px 12px;
+    color: var(--ink-muted);
+    font-size: 13px;
+  }
+  .empty a {
+    display: inline-block;
+    margin-top: 12px;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 10px;
+  }
+  .empty a:hover { background: var(--primary-dark); }
+
+  .games-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .game-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 14px;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow .15s ease, transform .15s ease;
+  }
+  .game-card:hover {
+    box-shadow: 0 8px 20px rgba(30, 40, 90, 0.10);
+    transform: translateY(-2px);
+  }
+  .game-card .emoji {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .game-card .name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .game-card .tag {
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+  .game-card.soon {
+    border-style: dashed;
+    color: var(--ink-muted);
+    cursor: default;
+  }
+  .game-card.soon:hover {
+    box-shadow: none;
+    transform: none;
+  }
+
+  @media (max-width: 420px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🎮 점심시간 게임 대시보드</h1>
+      <p>내 게임 기록을 한눈에 확인하세요</p>
+      <a class="back-link" href="index.html">← WEB으로 돌아가기</a>
+    </header>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-tile">
+        <div class="label">총 플레이</div>
+        <div class="value" id="statTotal">-</div>
+      </div>
+      <div class="stat-tile highlight">
+        <div class="label">최고 기록</div>
+        <div class="value" id="statBest">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">평균 시도</div>
+        <div class="value" id="statAvg">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">마지막 플레이</div>
+        <div class="value" id="statLast">-</div>
+      </div>
+    </div>
+
+    <div class="card" id="chartCard">
+      <h2>최근 기록</h2>
+      <p class="desc">막대 하나 = 게임 한 판의 시도 횟수 (낮을수록 좋아요) · 초록 막대는 최고 기록</p>
+      <div class="chart" id="chart"></div>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <div class="card">
+      <h2>게임 목록</h2>
+      <p class="desc">점심시간 5분, 짧게 즐기는 두뇌 게임</p>
+      <div class="games-grid">
+        <a class="game-card" href="number-game.html">
+          <div class="emoji">🎯</div>
+          <div class="name">숫자 맞추기</div>
+          <div class="tag">1~100 · 5분</div>
+        </a>
+        <div class="game-card soon">
+          <div class="emoji">🧩</div>
+          <div class="name">다음 게임</div>
+          <div class="tag">준비 중</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const STATS_KEY = 'numberGameStats';
+
+  function loadStats() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STATS_KEY));
+      if (raw && Array.isArray(raw.history)) return raw;
+    } catch (e) {}
+    return { totalPlays: 0, bestTries: null, history: [] };
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}.${dd} ${hh}:${mi}`;
+  }
+
+  function render() {
+    const stats = loadStats();
+    const total = stats.totalPlays || 0;
+    const history = stats.history || [];
+
+    document.getElementById('statTotal').textContent = total ? total + '회' : '-';
+    document.getElementById('statBest').textContent = stats.bestTries ? stats.bestTries + '회' : '-';
+
+    if (history.length) {
+      const avg = history.reduce((sum, h) => sum + h.tries, 0) / history.length;
+      document.getElementById('statAvg').textContent = avg.toFixed(1) + '회';
+      document.getElementById('statLast').textContent = formatDate(history[history.length - 1].date);
+    } else {
+      document.getElementById('statAvg').textContent = '-';
+      document.getElementById('statLast').textContent = '-';
+    }
+
+    const chartEl = document.getElementById('chart');
+    const chartCard = document.getElementById('chartCard');
+    const tooltip = document.getElementById('tooltip');
+    chartEl.innerHTML = '';
+
+    if (!history.length) {
+      chartCard.querySelector('.chart').style.display = 'none';
+      chartCard.querySelector('.desc').style.display = 'none';
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '아직 플레이 기록이 없어요.<br>첫 게임을 시작해보세요!<br><a href="number-game.html">🎯 숫자 맞추기 하러 가기</a>';
+      chartCard.appendChild(empty);
+      return;
+    }
+
+    const recent = history.slice(-10);
+    const maxTries = Math.max(...recent.map(h => h.tries), 5);
+    const best = stats.bestTries;
+
+    recent.forEach((h) => {
+      const bar = document.createElement('div');
+      bar.className = 'bar' + (h.tries === best ? ' is-best' : '');
+      const pct = Math.max((h.tries / maxTries) * 100, 6);
+      bar.style.height = pct + '%';
+
+      bar.addEventListener('mouseenter', (e) => {
+        tooltip.textContent = `${h.tries}회 · ${formatDate(h.date)}`;
+        tooltip.classList.add('show');
+      });
+      bar.addEventListener('mousemove', (e) => {
+        const rect = chartEl.getBoundingClientRect();
+        tooltip.style.left = (e.clientX - rect.left) + 'px';
+        tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+      });
+      bar.addEventListener('mouseleave', () => {
+        tooltip.classList.remove('show');
+      });
+
+      chartEl.appendChild(bar);
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>
