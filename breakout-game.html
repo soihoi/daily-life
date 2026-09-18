@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>벽돌깨기 게임 - 점심시간 5분 게임</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --primary: #4f6df5;
+    --primary-dark: #3b52c4;
+    --text: #1f2430;
+    --muted: #767d92;
+    --border: #e3e6f0;
+    --brick-1: #8b5a2b;
+    --brick-2: #a06a35;
+    --brick-3: #6f4522;
+    --paddle: #4f6df5;
+    --ball: #1f2430;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+    color: var(--text);
+    padding: 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card);
+    border-radius: 20px;
+    padding: 24px 20px 28px;
+    box-shadow: 0 12px 32px rgba(30, 40, 90, 0.08);
+    text-align: center;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .stats b {
+    color: var(--text);
+    font-size: 16px;
+    display: block;
+  }
+  .board {
+    position: relative;
+    width: 100%;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fdfbf8;
+    border: 1.5px solid var(--border);
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay.hide { display: none; }
+  .overlay .title {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .overlay .desc {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  button {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--primary);
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  button:hover { background: var(--primary-dark); }
+  footer {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧱 벽돌깨기</h1>
+    <p class="subtitle">점심시간 5분, 손가락 운동 게임</p>
+
+    <div class="stats">
+      <div>점수<b id="score">0</b></div>
+      <div>남은 기회<b id="lives">3</b></div>
+      <div>최고 점수<b id="best">-</b></div>
+    </div>
+
+    <div class="board">
+      <canvas id="game" width="320" height="400"></canvas>
+      <div class="overlay" id="overlay">
+        <div class="title" id="overlayTitle">클릭하면 시작해요</div>
+        <div class="desc">마우스나 키보드 ←/→ 로 막대를 움직여 공을 튕겨내세요</div>
+        <button id="startBtn">시작하기</button>
+      </div>
+    </div>
+
+    <footer>벽돌을 모두 깨면 승리! · 점심시간 두뇌 리프레시<br><a href="dashboard.html">📊 게임 대시보드로 돌아가기</a></footer>
+  </div>
+
+<script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const bestEl = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const startBtn = document.getElementById('startBtn');
+
+  const BEST_KEY = 'breakoutBestScore';
+
+  const ROWS = 5, COLS = 7;
+  const BRICK_PAD = 4;
+  const BRICK_TOP = 30;
+  const BRICK_SIDE = 10;
+  const BRICK_W = (W - BRICK_SIDE * 2 - BRICK_PAD * (COLS - 1)) / COLS;
+  const BRICK_H = 16;
+  const BROWN_SHADES = ['#8b5a2b', '#a06a35', '#79501f', '#96683a', '#6f4522'];
+
+  const PADDLE_W = 70, PADDLE_H = 10;
+  const BALL_R = 6;
+
+  let paddleX, ball, bricks, score, lives, running, raf;
+
+  function loadBest() {
+    try {
+      const v = parseInt(localStorage.getItem(BEST_KEY), 10);
+      if (v) bestEl.textContent = v + '점';
+    } catch (e) {}
+  }
+
+  function saveBest(s) {
+    try {
+      const v = parseInt(localStorage.getItem(BEST_KEY), 10);
+      if (!v || s > v) {
+        localStorage.setItem(BEST_KEY, s);
+        bestEl.textContent = s + '점';
+      }
+    } catch (e) {}
+  }
+
+  function buildBricks() {
+    const arr = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        arr.push({
+          x: BRICK_SIDE + c * (BRICK_W + BRICK_PAD),
+          y: BRICK_TOP + r * (BRICK_H + BRICK_PAD),
+          alive: true,
+          color: BROWN_SHADES[r % BROWN_SHADES.length]
+        });
+      }
+    }
+    return arr;
+  }
+
+  function resetBall() {
+    ball = {
+      x: W / 2,
+      y: H - 40,
+      dx: 2.6 * (Math.random() < 0.5 ? -1 : 1),
+      dy: -3
+    };
+    paddleX = W / 2 - PADDLE_W / 2;
+  }
+
+  function resetGame() {
+    bricks = buildBricks();
+    score = 0;
+    lives = 3;
+    scoreEl.textContent = '0';
+    livesEl.textContent = '3';
+    resetBall();
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    bricks.forEach(b => {
+      if (!b.alive) return;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, BRICK_W, BRICK_H, 3);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--paddle').trim();
+    ctx.beginPath();
+    ctx.roundRect(paddleX, H - 20, PADDLE_W, PADDLE_H, 5);
+    ctx.fill();
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ball').trim();
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function endGame(won) {
+    running = false;
+    cancelAnimationFrame(raf);
+    saveBest(score);
+    overlayTitle.textContent = won ? `🎉 승리! ${score}점` : `😵 게임 오버 (${score}점)`;
+    startBtn.textContent = '다시 시작';
+    overlay.classList.remove('hide');
+  }
+
+  function loseLife() {
+    lives--;
+    livesEl.textContent = lives;
+    if (lives <= 0) {
+      endGame(false);
+    } else {
+      resetBall();
+    }
+  }
+
+  function update() {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    if (ball.x - BALL_R < 0 || ball.x + BALL_R > W) ball.dx *= -1;
+    if (ball.y - BALL_R < 0) ball.dy *= -1;
+
+    if (
+      ball.y + BALL_R > H - 20 &&
+      ball.y + BALL_R < H - 20 + PADDLE_H &&
+      ball.x > paddleX &&
+      ball.x < paddleX + PADDLE_W &&
+      ball.dy > 0
+    ) {
+      const hitPos = (ball.x - (paddleX + PADDLE_W / 2)) / (PADDLE_W / 2);
+      ball.dx = hitPos * 4;
+      ball.dy = -Math.abs(ball.dy);
+    } else if (ball.y - BALL_R > H) {
+      loseLife();
+      return;
+    }
+
+    for (const b of bricks) {
+      if (!b.alive) continue;
+      if (
+        ball.x + BALL_R > b.x &&
+        ball.x - BALL_R < b.x + BRICK_W &&
+        ball.y + BALL_R > b.y &&
+        ball.y - BALL_R < b.y + BRICK_H
+      ) {
+        b.alive = false;
+        ball.dy *= -1;
+        score += 10;
+        scoreEl.textContent = score;
+        break;
+      }
+    }
+
+    if (bricks.every(b => !b.alive)) {
+      endGame(true);
+      return;
+    }
+
+    draw();
+    raf = requestAnimationFrame(update);
+  }
+
+  function movePaddleTo(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = W / rect.width;
+    const x = (clientX - rect.left) * scale - PADDLE_W / 2;
+    paddleX = Math.max(0, Math.min(W - PADDLE_W, x));
+    if (!running) draw();
+  }
+
+  canvas.addEventListener('mousemove', (e) => movePaddleTo(e.clientX));
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    movePaddleTo(e.touches[0].clientX);
+  }, { passive: false });
+
+  document.addEventListener('keydown', (e) => {
+    if (!running) return;
+    if (e.key === 'ArrowLeft') paddleX = Math.max(0, paddleX - 24);
+    if (e.key === 'ArrowRight') paddleX = Math.min(W - PADDLE_W, paddleX + 24);
+  });
+
+  function startGame() {
+    resetGame();
+    running = true;
+    overlay.classList.add('hide');
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(update);
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  loadBest();
+  resetGame();
+</script>
+</body>
+</html>
