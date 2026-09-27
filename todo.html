@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>할 일 관리 - 일일 · 월간 대시보드</title>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --primary: #4f6df5;
+    --primary-dark: #3b52c4;
+    --ink: #0b0b0b;
+    --ink-secondary: #52514e;
+    --ink-muted: #898781;
+    --gridline: #e1e0d9;
+    --border: rgba(11, 11, 11, 0.10);
+    --done: #1baf7a;
+    --danger: #e0533d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+    color: var(--ink);
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 20px; }
+  header h1 { font-size: 22px; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--ink-secondary); font-size: 13px; }
+  .back-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 6px;
+    margin-bottom: 20px;
+  }
+  .tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 10px 0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .tab-btn.active { background: var(--primary); color: #fff; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .nav-row .title { font-size: 16px; font-weight: 700; }
+  .nav-row .sub { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .nav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .nav-btn:hover { background: #f1f1ee; }
+  .today-btn {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    background: #eef1fe;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .today-btn:hover { background: #dfe4fc; }
+  .nav-center { display: flex; flex-direction: column; align-items: center; flex: 1; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-tile {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat-tile .label { font-size: 11px; color: var(--ink-muted); margin-bottom: 4px; }
+  .stat-tile .value { font-size: 18px; font-weight: 700; }
+  .stat-tile.highlight .value { color: var(--done); }
+
+  .progress-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--gridline);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--done);
+    border-radius: 999px;
+    transition: width .2s ease;
+  }
+
+  .add-form { display: flex; gap: 8px; margin-bottom: 16px; }
+  .add-form input[type="text"] {
+    flex: 1;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: #fff;
+  }
+  .add-form input[type="text"]:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+  .add-form button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .add-form button:hover { background: var(--primary-dark); }
+
+  .todo-list { display: flex; flex-direction: column; gap: 8px; }
+  .todo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 12px;
+  }
+  .todo-item .checkbox {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 2px solid var(--gridline);
+    flex: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #fff;
+    font-size: 13px;
+  }
+  .todo-item.done .checkbox {
+    background: var(--done);
+    border-color: var(--done);
+  }
+  .todo-item .text {
+    flex: 1;
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .todo-item.done .text {
+    text-decoration: line-through;
+    color: var(--ink-muted);
+  }
+  .todo-item .del-btn {
+    flex: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 8px;
+  }
+  .todo-item .del-btn:hover { background: #f6e6e3; color: var(--danger); }
+
+  .empty {
+    text-align: center;
+    padding: 30px 12px;
+    color: var(--ink-muted);
+    font-size: 13px;
+  }
+
+  /* Calendar */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+  }
+  .cal-dow {
+    font-size: 11px;
+    color: var(--ink-muted);
+    padding-bottom: 6px;
+    font-weight: 600;
+  }
+  .cal-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 2px;
+  }
+  .cal-cell:hover { background: #f1f1ee; }
+  .cal-cell.empty-cell { visibility: hidden; cursor: default; }
+  .cal-cell.is-today { border-color: var(--primary); border-width: 2px; }
+  .cal-cell .d-num { font-size: 12px; font-weight: 600; }
+  .cal-cell .d-badge {
+    font-size: 9px;
+    color: var(--ink-muted);
+  }
+  .cal-cell.all-done .d-badge { color: var(--done); font-weight: 700; }
+  .cal-cell.has-pending .d-num { color: var(--primary-dark); }
+  .cal-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--gridline);
+  }
+  .cal-cell.has-tasks .cal-dot { background: var(--primary); }
+  .cal-cell.all-done .cal-dot { background: var(--done); }
+
+  .month-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 380px) {
+    .stat-tile .value { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>✅ 할 일 관리</h1>
+      <p>심플한 일일 · 월간 대시보드</p>
+      <a class="back-link" href="index.html">← WEB으로 돌아가기</a>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tabDaily">일일</button>
+      <button class="tab-btn" id="tabMonthly">월간</button>
+    </div>
+
+    <!-- Daily View -->
+    <div id="dailyView">
+      <div class="card">
+        <div class="nav-row">
+          <button class="nav-btn" id="prevDay">‹</button>
+          <div class="nav-center">
+            <div class="title" id="dailyTitle">-</div>
+            <div class="sub" id="dailySub">-</div>
+          </div>
+          <button class="nav-btn" id="nextDay">›</button>
+        </div>
+        <div style="text-align:center; margin-bottom:16px;">
+          <button class="today-btn" id="goToday">오늘로 이동</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-tile">
+            <div class="label">전체</div>
+            <div class="value" id="dayTotal">0</div>
+          </div>
+          <div class="stat-tile highlight">
+            <div class="label">완료</div>
+            <div class="value" id="dayDone">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">남음</div>
+            <div class="value" id="dayLeft">0</div>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="dayProgress" style="width:0%"></div></div>
+
+        <form class="add-form" id="addForm">
+          <input type="text" id="newTodoText" placeholder="할 일을 입력하세요" maxlength="200" autocomplete="off">
+          <button type="submit">추가</button>
+        </form>
+
+        <div class="todo-list" id="todoList"></div>
+      </div>
+    </div>
+
+    <!-- Monthly View -->
+    <div id="monthlyView" class="hidden">
+      <div class="card">
+        <div class="nav-row">
+          <button class="nav-btn" id="prevMonth">‹</button>
+          <div class="nav-center">
+            <div class="title" id="monthTitle">-</div>
+            <div class="sub">날짜를 클릭하면 일일 화면으로 이동합니다</div>
+          </div>
+          <button class="nav-btn" id="nextMonth">›</button>
+        </div>
+
+        <div class="cal-grid" id="calGrid"></div>
+
+        <div class="month-summary">
+          <div class="stat-tile">
+            <div class="label">이번 달 할 일</div>
+            <div class="value" id="monthTotal">0</div>
+          </div>
+          <div class="stat-tile highlight">
+            <div class="label">완료</div>
+            <div class="value" id="monthDone">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">완료율</div>
+            <div class="value" id="monthRate">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const STORAGE_KEY = 'dailyLifeTodos';
+  const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+  let selectedDate = toDateStr(new Date());
+  let viewedMonth = new Date();
+  viewedMonth.setDate(1);
+
+  function loadTodos() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (Array.isArray(raw)) return raw;
+    } catch (e) {}
+    return [];
+  }
+
+  function saveTodos(todos) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+  }
+
+  function toDateStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseDateStr(s) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---------- Tabs ----------
+  const tabDaily = document.getElementById('tabDaily');
+  const tabMonthly = document.getElementById('tabMonthly');
+  const dailyView = document.getElementById('dailyView');
+  const monthlyView = document.getElementById('monthlyView');
+
+  tabDaily.addEventListener('click', () => switchTab('daily'));
+  tabMonthly.addEventListener('click', () => switchTab('monthly'));
+
+  function switchTab(which) {
+    const isDaily = which === 'daily';
+    tabDaily.classList.toggle('active', isDaily);
+    tabMonthly.classList.toggle('active', !isDaily);
+    dailyView.classList.toggle('hidden', !isDaily);
+    monthlyView.classList.toggle('hidden', isDaily);
+    if (!isDaily) renderMonthly();
+  }
+
+  // ---------- Daily View ----------
+  const dailyTitle = document.getElementById('dailyTitle');
+  const dailySub = document.getElementById('dailySub');
+  const todoListEl = document.getElementById('todoList');
+
+  document.getElementById('prevDay').addEventListener('click', () => {
+    const d = parseDateStr(selectedDate);
+    d.setDate(d.getDate() - 1);
+    selectedDate = toDateStr(d);
+    renderDaily();
+  });
+  document.getElementById('nextDay').addEventListener('click', () => {
+    const d = parseDateStr(selectedDate);
+    d.setDate(d.getDate() + 1);
+    selectedDate = toDateStr(d);
+    renderDaily();
+  });
+  document.getElementById('goToday').addEventListener('click', () => {
+    selectedDate = toDateStr(new Date());
+    renderDaily();
+  });
+
+  document.getElementById('addForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('newTodoText');
+    const text = input.value.trim();
+    if (!text) return;
+    const todos = loadTodos();
+    todos.push({ id: uid(), text, date: selectedDate, completed: false, createdAt: Date.now() });
+    saveTodos(todos);
+    input.value = '';
+    renderDaily();
+  });
+
+  function renderDaily() {
+    const d = parseDateStr(selectedDate);
+    const todayStr = toDateStr(new Date());
+    dailyTitle.textContent = `${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+    dailySub.textContent = selectedDate === todayStr ? '오늘' : `${d.getFullYear()}년`;
+
+    const todos = loadTodos().filter(t => t.date === selectedDate);
+    const total = todos.length;
+    const done = todos.filter(t => t.completed).length;
+    const left = total - done;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+
+    document.getElementById('dayTotal').textContent = total;
+    document.getElementById('dayDone').textContent = done;
+    document.getElementById('dayLeft').textContent = left;
+    document.getElementById('dayProgress').style.width = pct + '%';
+
+    todoListEl.innerHTML = '';
+    if (!total) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '이 날의 할 일이 없어요. 위에서 추가해보세요!';
+      todoListEl.appendChild(empty);
+      return;
+    }
+
+    todos
+      .slice()
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'todo-item' + (t.completed ? ' done' : '');
+
+        const box = document.createElement('div');
+        box.className = 'checkbox';
+        box.textContent = t.completed ? '✓' : '';
+        box.addEventListener('click', () => toggleTodo(t.id));
+
+        const text = document.createElement('div');
+        text.className = 'text';
+        text.textContent = t.text;
+        text.addEventListener('click', () => toggleTodo(t.id));
+
+        const del = document.createElement('button');
+        del.className = 'del-btn';
+        del.textContent = '✕';
+        del.title = '삭제';
+        del.addEventListener('click', () => deleteTodo(t.id));
+
+        row.appendChild(box);
+        row.appendChild(text);
+        row.appendChild(del);
+        todoListEl.appendChild(row);
+      });
+  }
+
+  function toggleTodo(id) {
+    const todos = loadTodos();
+    const t = todos.find(x => x.id === id);
+    if (t) t.completed = !t.completed;
+    saveTodos(todos);
+    renderDaily();
+    if (!monthlyView.classList.contains('hidden')) renderMonthly();
+  }
+
+  function deleteTodo(id) {
+    if (!confirm('이 할 일을 완전히 삭제할까요? (완료 표시는 체크박스를 이용하세요)')) return;
+    const todos = loadTodos().filter(t => t.id !== id);
+    saveTodos(todos);
+    renderDaily();
+  }
+
+  // ---------- Monthly View ----------
+  const monthTitle = document.getElementById('monthTitle');
+  const calGrid = document.getElementById('calGrid');
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    viewedMonth.setMonth(viewedMonth.getMonth() - 1);
+    renderMonthly();
+  });
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    viewedMonth.setMonth(viewedMonth.getMonth() + 1);
+    renderMonthly();
+  });
+
+  function renderMonthly() {
+    const year = viewedMonth.getFullYear();
+    const month = viewedMonth.getMonth();
+    monthTitle.textContent = `${year}년 ${month + 1}월`;
+
+    const todos = loadTodos();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDow = firstDay.getDay();
+    const todayStr = toDateStr(new Date());
+
+    calGrid.innerHTML = '';
+    DOW.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      calGrid.appendChild(el);
+    });
+
+    for (let i = 0; i < startDow; i++) {
+      const filler = document.createElement('div');
+      filler.className = 'cal-cell empty-cell';
+      calGrid.appendChild(filler);
+    }
+
+    let monthTotal = 0, monthDone = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayTodos = todos.filter(t => t.date === dateStr);
+      const total = dayTodos.length;
+      const done = dayTodos.filter(t => t.completed).length;
+      monthTotal += total;
+      monthDone += done;
+
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      if (dateStr === todayStr) cell.classList.add('is-today');
+      if (total > 0) cell.classList.add('has-tasks');
+      if (total > 0 && done === total) cell.classList.add('all-done');
+      if (total > 0 && done < total) cell.classList.add('has-pending');
+
+      const num = document.createElement('div');
+      num.className = 'd-num';
+      num.textContent = day;
+      cell.appendChild(num);
+
+      if (total > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'd-badge';
+        badge.textContent = `${done}/${total}`;
+        cell.appendChild(badge);
+      } else {
+        const dot = document.createElement('div');
+        dot.className = 'cal-dot';
+        cell.appendChild(dot);
+      }
+
+      cell.addEventListener('click', () => {
+        selectedDate = dateStr;
+        switchTab('daily');
+        renderDaily();
+      });
+
+      calGrid.appendChild(cell);
+    }
+
+    document.getElementById('monthTotal').textContent = monthTotal;
+    document.getElementById('monthDone').textContent = monthDone;
+    document.getElementById('monthRate').textContent = monthTotal ? Math.round((monthDone / monthTotal) * 100) + '%' : '0%';
+  }
+
+  renderDaily();
+</script>
+</body>
+</html>
